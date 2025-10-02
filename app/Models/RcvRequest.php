@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class RcvRequest extends Model
 {
     protected $fillable = [
+        'user_id',
         'period',
         'type',
         'status',
@@ -23,4 +24,9 @@ class RcvRequest extends Model
         'requested_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

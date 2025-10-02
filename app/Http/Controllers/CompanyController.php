@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Company;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -41,7 +42,9 @@ class CompanyController extends Controller
 
         $validated['user_id'] = $request->user()->id;
 
-        Company::create($validated);
+        $company = Company::create($validated);
+
+        ActivityLog::log('create', 'Company', $company->id, "Empresa '{$company->name}' creada");
 
         return redirect()->route('companies.index')
             ->with('success', 'Empresa creada exitosamente.');
@@ -80,6 +83,8 @@ class CompanyController extends Controller
 
         $company->update($validated);
 
+        ActivityLog::log('update', 'Company', $company->id, "Empresa '{$company->name}' actualizada");
+
         return redirect()->route('companies.index')
             ->with('success', 'Empresa actualizada exitosamente.');
     }
@@ -89,7 +94,12 @@ class CompanyController extends Controller
      */
     public function destroy(Company $company)
     {
+        $companyName = $company->name;
+        $companyId = $company->id;
+
         $company->delete();
+
+        ActivityLog::log('delete', 'Company', $companyId, "Empresa '{$companyName}' eliminada");
 
         return redirect()->route('companies.index')
             ->with('success', 'Empresa eliminada exitosamente.');

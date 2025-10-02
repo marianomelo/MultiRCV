@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 
 defineProps({
     users: Array
@@ -12,6 +12,21 @@ const getRoleBadgeClass = (role) => {
 
 const getRoleText = (role) => {
     return role === 'super_admin' ? 'Super Admin' : 'Usuario';
+};
+
+const getApprovalBadgeClass = (isApproved) => {
+    return isApproved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+};
+
+const getApprovalText = (isApproved) => {
+    return isApproved ? 'Aprobado' : 'Pendiente';
+};
+
+const approveUser = (userId) => {
+    const form = useForm({});
+    form.post(route('users.approve', userId), {
+        preserveScroll: true,
+    });
 };
 </script>
 
@@ -48,7 +63,16 @@ const getRoleText = (role) => {
                                             Email
                                         </th>
                                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                            Teléfono
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                                             Rol
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                            Estado
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                            Contador
                                         </th>
                                         <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                                             Acciones
@@ -68,6 +92,11 @@ const getRoleText = (role) => {
                                             </div>
                                         </td>
                                         <td class="whitespace-nowrap px-6 py-4">
+                                            <div class="text-sm text-gray-900">
+                                                {{ user.phone || '-' }}
+                                            </div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-6 py-4">
                                             <span
                                                 :class="getRoleBadgeClass(user.role)"
                                                 class="inline-flex rounded-full px-2 text-xs font-semibold leading-5"
@@ -75,7 +104,27 @@ const getRoleText = (role) => {
                                                 {{ getRoleText(user.role) }}
                                             </span>
                                         </td>
+                                        <td class="whitespace-nowrap px-6 py-4">
+                                            <span
+                                                :class="getApprovalBadgeClass(user.is_approved)"
+                                                class="inline-flex rounded-full px-2 text-xs font-semibold leading-5"
+                                            >
+                                                {{ getApprovalText(user.is_approved) }}
+                                            </span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-6 py-4">
+                                            <span class="text-sm text-gray-900">
+                                                {{ user.is_accountant ? 'Sí' : 'No' }}
+                                            </span>
+                                        </td>
                                         <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                                            <button
+                                                v-if="!user.is_approved"
+                                                @click="approveUser(user.id)"
+                                                class="text-green-600 hover:text-green-900 mr-4"
+                                            >
+                                                Aprobar
+                                            </button>
                                             <Link
                                                 :href="route('users.edit', user.id)"
                                                 class="text-indigo-600 hover:text-indigo-900 mr-4"
@@ -94,7 +143,7 @@ const getRoleText = (role) => {
                                         </td>
                                     </tr>
                                     <tr v-if="users.length === 0">
-                                        <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
                                             No hay usuarios registrados
                                         </td>
                                     </tr>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Company;
 use App\Models\RcvRequest;
 use Illuminate\Http\Request;
@@ -15,7 +16,9 @@ class RcvController extends Controller
     public function index(Request $request)
     {
         $companies = Company::where('user_id', $request->user()->id)->get();
-        $requests = RcvRequest::latest()->paginate(10);
+        $requests = RcvRequest::where('user_id', $request->user()->id)
+            ->latest()
+            ->get();
 
         return Inertia::render('Rcv/Index', [
             'companies' => $companies,
@@ -33,17 +36,27 @@ class RcvController extends Controller
         ]);
 
         $rcvRequest = RcvRequest::create([
+            'user_id' => $request->user()->id,
             'period' => $validated['period'],
             'type' => $validated['type'],
             'company_ids' => $validated['company_ids'],
             'status' => 'pending',
+            'total_companies' => count($validated['company_ids']),
+            'processed_companies' => 0,
         ]);
 
-        // Process the request immediately
-        $this->processRcvRequest($rcvRequest);
+        ActivityLog::log(
+            'create',
+            'RcvRequest',
+            $rcvRequest->id,
+            "Solicitud de RCV creada para período {$rcvRequest->period} tipo {$rcvRequest->type}"
+        );
+
+        // Dispatch job to process in background
+        \App\Jobs\ProcessRcvRequest::dispatch($rcvRequest);
 
         return redirect()->route('rcv.index')
-            ->with('success', 'Solicitud de RCV creada exitosamente.');
+            ->with('success', 'Solicitud de RCV creada. Se está procesando en segundo plano.');
     }
 
     protected function processRcvRequest(RcvRequest $rcvRequest)
@@ -55,19 +68,36 @@ class RcvController extends Controller
 
         foreach ($companies as $company) {
             try {
-                $response = Http::timeout(30)->post("http://localhost:3000/api/consulta/{$rcvRequest->period}/{$rcvRequest->type}", [
-                    'rut' => $company->rut,
-                    'contrasena' => $company->sii_password,
-                ]);
+                $response = Http::timeout(30)
+                    ->withHeaders([
+                        'x-api-key' => '123456789',
+                    ])
+                    ->post("https://api-rcv.hostingsistemas.cl/api/consulta/{$rcvRequest->period}/{$rcvRequest->type}", [
+                        'rut' => $company->rut,
+                        'contrasena' => $company->sii_password,
+                    ]);
 
                 if ($response->successful()) {
-                    $results[] = [
-                        'company_id' => $company->id,
-                        'company_name' => $company->name,
-                        'rut' => $company->rut,
-                        'status' => 'success',
-                        'data' => $response->json(),
-                    ];
+                    $responseData = $response->json();
+
+                    // Check if there's no data available
+                    if (isset($responseData['total_registros']) && $responseData['total_registros'] == 0) {
+                        $results[] = [
+                            'company_id' => $company->id,
+                            'company_name' => $company->name,
+                            'rut' => $company->rut,
+                            'status' => 'warning',
+                            'warning' => $responseData['message'] ?? 'No se encontraron datos para el período consultado',
+                        ];
+                    } else {
+                        $results[] = [
+                            'company_id' => $company->id,
+                            'company_name' => $company->name,
+                            'rut' => $company->rut,
+                            'status' => 'success',
+                            'data' => $responseData,
+                        ];
+                    }
                 } else {
                     $results[] = [
                         'company_id' => $company->id,
@@ -98,20 +128,37 @@ class RcvController extends Controller
         ]);
     }
 
-    public function show(RcvRequest $rcvRequest)
+    public function show(Request $request, RcvRequest $rcvRequest)
     {
+        // Verify that the user owns this request
+        if ($rcvRequest->user_id !== $request->user()->id) {
+            abort(403, 'No tienes permiso para ver esta solicitud.');
+        }
+
         return Inertia::render('Rcv/Show', [
             'request' => $rcvRequest
         ]);
     }
 
-    public function export(RcvRequest $rcvRequest, $companyId)
+    public function export(Request $request, RcvRequest $rcvRequest, $companyId)
     {
+        // Verify that the user owns this request
+        if ($rcvRequest->user_id !== $request->user()->id) {
+            abort(403, 'No tienes permiso para exportar esta solicitud.');
+        }
+
         $result = collect($rcvRequest->response_data)->firstWhere('company_id', (int)$companyId);
 
         if (!$result || $result['status'] !== 'success') {
             abort(404, 'No se encontraron datos para exportar');
         }
+
+        ActivityLog::log(
+            'export',
+            'RcvRequest',
+            $rcvRequest->id,
+            "Exportó RCV de {$result['company_name']} para período {$rcvRequest->period}"
+        );
 
         $data = $result['data'];
         $spreadsheet = new Spreadsheet();
@@ -124,44 +171,52 @@ class RcvController extends Controller
         $sheet->setCellValue('A4', 'Tipo: ' . ucfirst($rcvRequest->type));
         $sheet->setCellValue('A5', 'Total Registros: ' . ($data['total_registros'] ?? 0));
 
-        // Headers for the data table
+        // Headers for the data table - dynamically from API response
         $row = 7;
-        $headers = [
-            'Nro', 'Tipo Doc', 'Tipo Compra', 'RUT Proveedor', 'Razón Social',
-            'Folio', 'Fecha Docto', 'Fecha Recepción', 'Monto Exento',
-            'Monto Neto', 'Monto IVA Recuperable', 'Monto Total'
-        ];
+        $headers = [];
+        $fieldKeys = [];
 
-        $col = 'A';
+        // Get all field keys from the first record
+        if (isset($data['datos']) && is_array($data['datos']) && count($data['datos']) > 0) {
+            $firstRecord = $data['datos'][0];
+            foreach ($firstRecord as $key => $value) {
+                // Skip __parsed_extra if present
+                if ($key === '__parsed_extra') {
+                    continue;
+                }
+                $fieldKeys[] = $key;
+                // Convert snake_case to Title Case for headers
+                $headers[] = ucwords(str_replace('_', ' ', $key));
+            }
+        }
+
+        // Write headers
+        $colIndex = 0;
         foreach ($headers as $header) {
-            $sheet->setCellValue($col . $row, $header);
-            $sheet->getStyle($col . $row)->getFont()->setBold(true);
-            $col++;
+            $colLetter = $this->getColumnLetter($colIndex);
+            $sheet->setCellValue($colLetter . $row, $header);
+            $sheet->getStyle($colLetter . $row)->getFont()->setBold(true);
+            $colIndex++;
         }
 
         // Data rows
         if (isset($data['datos']) && is_array($data['datos'])) {
             $row = 8;
             foreach ($data['datos'] as $item) {
-                $sheet->setCellValue('A' . $row, $item['nro'] ?? '');
-                $sheet->setCellValue('B' . $row, $item['tipo_doc'] ?? '');
-                $sheet->setCellValue('C' . $row, $item['tipo_compra'] ?? '');
-                $sheet->setCellValue('D' . $row, $item['rut_proveedor'] ?? '');
-                $sheet->setCellValue('E' . $row, $item['razon_social'] ?? '');
-                $sheet->setCellValue('F' . $row, $item['folio'] ?? '');
-                $sheet->setCellValue('G' . $row, $item['fecha_docto'] ?? '');
-                $sheet->setCellValue('H' . $row, $item['fecha_recepcion'] ?? '');
-                $sheet->setCellValue('I' . $row, $item['monto_exento'] ?? 0);
-                $sheet->setCellValue('J' . $row, $item['monto_neto'] ?? 0);
-                $sheet->setCellValue('K' . $row, $item['monto_iva_recuperable'] ?? 0);
-                $sheet->setCellValue('L' . $row, $item['monto_total'] ?? 0);
+                $colIndex = 0;
+                foreach ($fieldKeys as $key) {
+                    $colLetter = $this->getColumnLetter($colIndex);
+                    $sheet->setCellValue($colLetter . $row, $item[$key] ?? '');
+                    $colIndex++;
+                }
                 $row++;
             }
         }
 
-        // Auto-size columns
-        foreach (range('A', 'L') as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
+        // Auto-size all columns
+        for ($i = 0; $i < count($fieldKeys); $i++) {
+            $colLetter = $this->getColumnLetter($i);
+            $sheet->getColumnDimension($colLetter)->setAutoSize(true);
         }
 
         $writer = new Xlsx($spreadsheet);
@@ -172,5 +227,38 @@ class RcvController extends Controller
         $writer->save($tempFile);
 
         return response()->download($tempFile, $fileName)->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Convert column index to Excel column letter (0 = A, 1 = B, ..., 26 = AA, etc.)
+     */
+    protected function getColumnLetter($index)
+    {
+        $letter = '';
+        while ($index >= 0) {
+            $letter = chr($index % 26 + 65) . $letter;
+            $index = floor($index / 26) - 1;
+        }
+        return $letter;
+    }
+
+    public function destroy(Request $request, RcvRequest $rcvRequest)
+    {
+        // Verify that the user owns this request
+        if ($rcvRequest->user_id !== $request->user()->id) {
+            abort(403, 'No tienes permiso para eliminar esta solicitud.');
+        }
+
+        ActivityLog::log(
+            'delete',
+            'RcvRequest',
+            $rcvRequest->id,
+            "Eliminó solicitud RCV del período {$rcvRequest->period} tipo {$rcvRequest->type}"
+        );
+
+        $rcvRequest->delete();
+
+        return redirect()->route('rcv.index')
+            ->with('success', 'Solicitud eliminada exitosamente.');
     }
 }

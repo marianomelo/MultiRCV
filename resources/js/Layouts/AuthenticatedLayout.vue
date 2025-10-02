@@ -5,6 +5,7 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
+import SupportWidget from '@/Components/SupportWidget.vue';
 import { Link } from '@inertiajs/vue3';
 
 const showingNavigationDropdown = ref(false);
@@ -57,6 +58,13 @@ const showingNavigationDropdown = ref(false);
                                     :active="route().current('users.*')"
                                 >
                                     Usuarios
+                                </NavLink>
+                                <NavLink
+                                    v-if="$page.props.auth.user?.role === 'super_admin'"
+                                    :href="route('activity-logs.index')"
+                                    :active="route().current('activity-logs.*')"
+                                >
+                                    Actividad
                                 </NavLink>
                             </div>
                         </div>
@@ -231,6 +239,9 @@ const showingNavigationDropdown = ref(false);
             <main>
                 <slot />
             </main>
+
+            <!-- Support Widget -->
+            <SupportWidget />
         </div>
     </div>
 </template>

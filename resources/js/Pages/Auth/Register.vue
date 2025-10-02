@@ -9,8 +9,10 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 const form = useForm({
     name: '',
     email: '',
+    phone: '',
     password: '',
     password_confirmation: '',
+    is_accountant: false,
 });
 
 const submit = () => {
@@ -42,7 +44,7 @@ const submit = () => {
             </div>
 
             <div class="mt-4">
-                <InputLabel for="email" value="Email" />
+                <InputLabel for="email" value="Correo Electrónico" />
 
                 <TextInput
                     id="email"
@@ -57,7 +59,22 @@ const submit = () => {
             </div>
 
             <div class="mt-4">
-                <InputLabel for="password" value="Password" />
+                <InputLabel for="phone" value="Número de Teléfono" />
+
+                <TextInput
+                    id="phone"
+                    type="tel"
+                    class="mt-1 block w-full"
+                    v-model="form.phone"
+                    required
+                    autocomplete="tel"
+                />
+
+                <InputError class="mt-2" :message="form.errors.phone" />
+            </div>
+
+            <div class="mt-4">
+                <InputLabel for="password" value="Contraseña" />
 
                 <TextInput
                     id="password"
@@ -74,7 +91,7 @@ const submit = () => {
             <div class="mt-4">
                 <InputLabel
                     for="password_confirmation"
-                    value="Confirm Password"
+                    value="Confirmar Contraseña"
                 />
 
                 <TextInput
@@ -90,6 +107,20 @@ const submit = () => {
                     class="mt-2"
                     :message="form.errors.password_confirmation"
                 />
+            </div>
+
+            <div class="mt-4">
+                <label class="flex items-center">
+                    <input
+                        type="checkbox"
+                        id="is_accountant"
+                        v-model="form.is_accountant"
+                        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                    />
+                    <span class="ms-2 text-sm text-gray-600">Soy Contador</span>
+                </label>
+
+                <InputError class="mt-2" :message="form.errors.is_accountant" />
             </div>
 
             <div class="mt-4 flex items-center justify-end">

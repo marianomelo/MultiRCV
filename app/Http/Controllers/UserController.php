@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\UserApproved;
+use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class UserController extends Controller
@@ -34,7 +37,9 @@ class UserController extends Controller
 
         $validated['password'] = Hash::make($validated['password']);
 
-        User::create($validated);
+        $user = User::create($validated);
+
+        ActivityLog::log('create', 'User', $user->id, "Usuario '{$user->name}' creado");
 
         return redirect()->route('users.index')
             ->with('success', 'Usuario creado exitosamente.');
@@ -64,15 +69,43 @@ class UserController extends Controller
 
         $user->update($validated);
 
+        ActivityLog::log('update', 'User', $user->id, "Usuario '{$user->name}' actualizado");
+
         return redirect()->route('users.index')
             ->with('success', 'Usuario actualizado exitosamente.');
     }
 
     public function destroy(User $user)
     {
+        $userName = $user->name;
+        $userId = $user->id;
+
         $user->delete();
+
+        ActivityLog::log('delete', 'User', $userId, "Usuario '{$userName}' eliminado");
 
         return redirect()->route('users.index')
             ->with('success', 'Usuario eliminado exitosamente.');
+    }
+
+    public function approve(User $user)
+    {
+        if ($user->is_approved) {
+            return redirect()->route('users.index')
+                ->with('error', 'Este usuario ya está aprobado.');
+        }
+
+        $user->update([
+            'is_approved' => true,
+            'approved_at' => now(),
+        ]);
+
+        ActivityLog::log('update', 'User', $user->id, "Usuario '{$user->name}' aprobado");
+
+        // Send approval email
+        Mail::to($user->email)->send(new UserApproved($user));
+
+        return redirect()->route('users.index')
+            ->with('success', 'Usuario aprobado exitosamente. Se ha enviado un correo de notificación.');
     }
 }

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Mail\NewUserRegistered;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,17 +35,28 @@ class RegisteredUserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
+            'phone' => 'required|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'is_accountant' => 'boolean',
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
+            'phone' => $request->phone,
             'password' => Hash::make($request->password),
+            'is_accountant' => $request->is_accountant ?? false,
+            'role' => 'user',
+            'is_approved' => true,
+            'approved_at' => now(),
         ]);
 
         event(new Registered($user));
 
+        // Send notification email to support
+        Mail::to('soporte@tecnologicachile.cl')->send(new NewUserRegistered($user));
+
+        // Auto-login after registration
         Auth::login($user);
 
         return redirect(route('dashboard', absolute: false));

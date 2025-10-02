@@ -37,6 +37,21 @@ const submit = () => {
             {{ status }}
         </div>
 
+        <div v-if="$page.props.flash.success" class="mb-4 rounded-md bg-green-50 p-4 border border-green-200">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-green-800">
+                        {{ $page.props.flash.success }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
         <form @submit.prevent="submit">
             <div>
                 <InputLabel for="email" value="Email" />
@@ -94,6 +109,16 @@ const submit = () => {
                 >
                     Log in
                 </PrimaryButton>
+            </div>
+
+            <div class="mt-6 text-center">
+                <span class="text-sm text-gray-600">¿No tienes cuenta? </span>
+                <Link
+                    :href="route('register')"
+                    class="text-sm text-indigo-600 underline hover:text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                >
+                    Regístrate aquí
+                </Link>
             </div>
         </form>
     </GuestLayout>
