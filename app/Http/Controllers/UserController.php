@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\UserApproved;
 use App\Models\ActivityLog;
+use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -14,10 +15,12 @@ class UserController extends Controller
 {
     public function index()
     {
-        $users = User::all();
+        $users = User::with('plan')->get();
+        $plans = Plan::orderBy('price')->get();
 
         return Inertia::render('Users/Index', [
-            'users' => $users
+            'users' => $users,
+            'plans' => $plans,
         ]);
     }
 
@@ -107,5 +110,30 @@ class UserController extends Controller
 
         return redirect()->route('users.index')
             ->with('success', 'Usuario aprobado exitosamente. Se ha enviado un correo de notificación.');
+    }
+
+    public function changePlan(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'plan_id' => 'required|exists:plans,id',
+        ]);
+
+        $plan = Plan::findOrFail($validated['plan_id']);
+
+        // Check if user has more companies than new plan allows
+        $currentCompanyCount = $user->companies()->count();
+        if ($currentCompanyCount > $plan->company_limit) {
+            return redirect()->back()
+                ->with('error', "No se puede asignar este plan. El usuario tiene {$currentCompanyCount} empresas pero este plan solo permite {$plan->company_limit}.");
+        }
+
+        $oldPlan = $user->plan ? $user->plan->name : 'Sin plan';
+        $user->plan_id = $validated['plan_id'];
+        $user->save();
+
+        ActivityLog::log('update', 'User', $user->id, "Plan del usuario '{$user->name}' cambiado de '{$oldPlan}' a '{$plan->name}'");
+
+        return redirect()->route('users.index')
+            ->with('success', "Plan del usuario actualizado a {$plan->name} exitosamente.");
     }
 }

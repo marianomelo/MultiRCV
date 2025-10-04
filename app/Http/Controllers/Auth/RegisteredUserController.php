@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Mail\NewUserRegistered;
+use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -40,6 +41,9 @@ class RegisteredUserController extends Controller
             'is_accountant' => 'boolean',
         ]);
 
+        // Get the free plan
+        $freePlan = Plan::where('slug', 'gratis')->first();
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
@@ -47,6 +51,7 @@ class RegisteredUserController extends Controller
             'password' => Hash::make($request->password),
             'is_accountant' => $request->is_accountant ?? false,
             'role' => 'user',
+            'plan_id' => $freePlan?->id,
             'is_approved' => true,
             'approved_at' => now(),
         ]);

@@ -3,7 +3,8 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 
 defineProps({
-    users: Array
+    users: Array,
+    plans: Array
 });
 
 const getRoleBadgeClass = (role) => {
@@ -25,6 +26,15 @@ const getApprovalText = (isApproved) => {
 const approveUser = (userId) => {
     const form = useForm({});
     form.post(route('users.approve', userId), {
+        preserveScroll: true,
+    });
+};
+
+const changePlan = (userId, planId) => {
+    const form = useForm({
+        plan_id: planId
+    });
+    form.post(route('users.change-plan', userId), {
         preserveScroll: true,
     });
 };
@@ -74,6 +84,9 @@ const approveUser = (userId) => {
                                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                                             Contador
                                         </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                            Plan
+                                        </th>
                                         <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                                             Acciones
                                         </th>
@@ -117,6 +130,22 @@ const approveUser = (userId) => {
                                                 {{ user.is_accountant ? 'Sí' : 'No' }}
                                             </span>
                                         </td>
+                                        <td class="whitespace-nowrap px-6 py-4">
+                                            <select
+                                                :value="user.plan_id"
+                                                @change="changePlan(user.id, $event.target.value)"
+                                                class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                            >
+                                                <option :value="null">Sin plan</option>
+                                                <option
+                                                    v-for="plan in plans"
+                                                    :key="plan.id"
+                                                    :value="plan.id"
+                                                >
+                                                    {{ plan.name }} (${{ plan.price.toLocaleString('es-CL') }})
+                                                </option>
+                                            </select>
+                                        </td>
                                         <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                             <button
                                                 v-if="!user.is_approved"
@@ -143,7 +172,7 @@ const approveUser = (userId) => {
                                         </td>
                                     </tr>
                                     <tr v-if="users.length === 0">
-                                        <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">
                                             No hay usuarios registrados
                                         </td>
                                     </tr>

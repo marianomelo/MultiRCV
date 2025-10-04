@@ -2,8 +2,11 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
-defineProps({
-    companies: Array
+const props = defineProps({
+    companies: Array,
+    userPlan: Object,
+    canAddMore: Boolean,
+    remainingCompanies: Number,
 });
 </script>
 
@@ -13,15 +16,40 @@ defineProps({
     <AuthenticatedLayout>
         <template #header>
             <div class="flex justify-between items-center">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                    Empresas
-                </h2>
-                <Link
-                    :href="route('companies.create')"
-                    class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-                >
-                    Crear Empresa
-                </Link>
+                <div>
+                    <h2 class="text-xl font-semibold leading-tight text-gray-800">
+                        Empresas
+                    </h2>
+                    <p v-if="userPlan" class="text-sm text-gray-600 mt-1">
+                        Plan: <span class="font-semibold">{{ userPlan.name }}</span>
+                        - {{ companies.length }}/{{ userPlan.company_limit }} empresas
+                        <span v-if="remainingCompanies > 0" class="text-green-600">
+                            ({{ remainingCompanies }} disponibles)
+                        </span>
+                        <span v-else class="text-red-600">
+                            (límite alcanzado)
+                        </span>
+                    </p>
+                </div>
+                <div class="flex gap-3">
+                    <Link
+                        v-if="!canAddMore"
+                        href="/plans"
+                        class="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500"
+                    >
+                        Actualizar Plan
+                    </Link>
+                    <Link
+                        :href="route('companies.create')"
+                        :class="[
+                            'rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm',
+                            canAddMore ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-gray-400 cursor-not-allowed'
+                        ]"
+                        :disabled="!canAddMore"
+                    >
+                        Crear Empresa
+                    </Link>
+                </div>
             </div>
         </template>
 

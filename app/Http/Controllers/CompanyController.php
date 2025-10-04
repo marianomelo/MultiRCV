@@ -15,9 +15,13 @@ class CompanyController extends Controller
     public function index(Request $request)
     {
         $companies = Company::where('user_id', $request->user()->id)->get();
+        $user = $request->user()->load('plan');
 
         return Inertia::render('Companies/Index', [
-            'companies' => $companies
+            'companies' => $companies,
+            'userPlan' => $user->plan,
+            'canAddMore' => $user->canAddMoreCompanies(),
+            'remainingCompanies' => $user->remainingCompanies(),
         ]);
     }
 
@@ -34,6 +38,12 @@ class CompanyController extends Controller
      */
     public function store(Request $request)
     {
+        // Check if user can add more companies
+        if (!$request->user()->canAddMoreCompanies()) {
+            return redirect()->back()
+                ->with('error', 'Has alcanzado el límite de empresas de tu plan. Por favor actualiza tu plan para agregar más empresas.');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'rut' => 'required|string|unique:companies,rut',

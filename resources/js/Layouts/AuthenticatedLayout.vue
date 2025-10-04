@@ -53,11 +53,24 @@ const showingNavigationDropdown = ref(false);
                                     RCV
                                 </NavLink>
                                 <NavLink
+                                    :href="route('plans.index')"
+                                    :active="route().current('plans.*')"
+                                >
+                                    Planes
+                                </NavLink>
+                                <NavLink
                                     v-if="$page.props.auth.user?.role === 'super_admin'"
                                     :href="route('users.index')"
                                     :active="route().current('users.*')"
                                 >
                                     Usuarios
+                                </NavLink>
+                                <NavLink
+                                    v-if="$page.props.auth.user?.role === 'super_admin'"
+                                    :href="route('payments.index')"
+                                    :active="route().current('payments.*')"
+                                >
+                                    Pagos
                                 </NavLink>
                                 <NavLink
                                     v-if="$page.props.auth.user?.role === 'super_admin'"
@@ -186,11 +199,31 @@ const showingNavigationDropdown = ref(false);
                             RCV
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            :href="route('plans.index')"
+                            :active="route().current('plans.*')"
+                        >
+                            Planes
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
                             v-if="$page.props.auth.user?.role === 'super_admin'"
                             :href="route('users.index')"
                             :active="route().current('users.*')"
                         >
                             Usuarios
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="$page.props.auth.user?.role === 'super_admin'"
+                            :href="route('payments.index')"
+                            :active="route().current('payments.*')"
+                        >
+                            Pagos
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="$page.props.auth.user?.role === 'super_admin'"
+                            :href="route('activity-logs.index')"
+                            :active="route().current('activity-logs.*')"
+                        >
+                            Actividad
                         </ResponsiveNavLink>
                     </div>
 

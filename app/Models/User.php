@@ -23,6 +23,7 @@ class User extends Authenticatable
         'phone',
         'password',
         'role',
+        'plan_id',
         'is_accountant',
         'is_approved',
         'approved_at',
@@ -62,5 +63,30 @@ class User extends Authenticatable
     public function companies()
     {
         return $this->hasMany(Company::class);
+    }
+
+    public function plan()
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
+    public function canAddMoreCompanies(): bool
+    {
+        if (!$this->plan) {
+            return false;
+        }
+
+        $currentCount = $this->companies()->count();
+        return $currentCount < $this->plan->company_limit;
+    }
+
+    public function remainingCompanies(): int
+    {
+        if (!$this->plan) {
+            return 0;
+        }
+
+        $currentCount = $this->companies()->count();
+        return max(0, $this->plan->company_limit - $currentCount);
     }
 }
